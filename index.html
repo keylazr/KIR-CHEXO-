@@ -1,72 +1,342 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const { text } = req.body;
-  if (!text || text.length < 50) {
-    return res.status(400).json({ error: 'Teks terlalu pendek.' });
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KIR CHEXO — AI Text Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #04060f;
+    --surface: #080d1c;
+    --border: #0f1e3d;
+    --text: #dce8ff;
+    --muted: #4a6090;
+    --accent-ai: #f03a5f;
+    --accent-human: #00cfff;
+    --accent-yellow: #ffd166;
+    --blue-main: #2d7fff;
+    --blue-bright: #5ba3ff;
+    --glow-ai: rgba(240,58,95,0.15);
+    --glow-human: rgba(0,207,255,0.15);
   }
-
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const prompt = `Kamu adalah sistem pendeteksi teks AI yang sangat ahli. Analisis teks berikut dan tentukan apakah ditulis oleh AI atau manusia.
-
-Teks untuk dianalisis:
-"""
-${text}
-"""
-
-Berikan respons HANYA dalam format JSON berikut (tidak ada teks lain di luar JSON, tanpa markdown):
-{
-  "ai_probability": <angka 0-100>,
-  "verdict": "<'AI' | 'MANUSIA' | 'CAMPURAN'>",
-  "confidence": "<'Sangat Yakin' | 'Cukup Yakin' | 'Tidak Pasti'>",
-  "signals": [
-    {"type": "<'negative'|'positive'|'neutral'>", "text": "<deskripsi singkat sinyal, maks 8 kata>"}
-  ],
-  "analysis": "<paragraf analisis dalam bahasa Indonesia, 3-4 kalimat>"
-}
-
-Panduan:
-- negative = indikator AI (struktur terlalu rapi, dll)
-- positive = indikator manusia (typo, ekspresi informal, dll)
-- neutral = bisa keduanya
-- Maksimal 6 sinyal
-- ai_probability 0 = pasti manusia, 100 = pasti AI`;
-
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://kir-chexo.vercel.app',
-        'X-Title': 'KIR CHEXO'
-      },
-      body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-8b-instruct:free',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1000
-      })
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || 'OpenRouter API error');
-
-    const raw = data.choices?.[0]?.message?.content || '';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(clean);
-
-    return res.status(200).json(result);
-  } catch (err) {
-    return res.status(500).json({ error: 'Gagal menganalisis: ' + err.message });
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
-}
+  body::before {
+    content: '';
+    position: fixed;
+    top: -20%; left: -10%;
+    width: 60%; height: 60%;
+    background: radial-gradient(ellipse, rgba(45,127,255,0.10) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -20%; right: -10%;
+    width: 50%; height: 50%;
+    background: radial-gradient(ellipse, rgba(91,163,255,0.07) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+  .wrapper {
+    position: relative; z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 56px;
+    flex-wrap: wrap;
+  }
+  .logo-block { display: flex; flex-direction: column; line-height: 1; }
+  .logo-kir {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    color: var(--blue-main);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 2.6rem;
+    letter-spacing: -0.04em;
+    color: #fff;
+    line-height: 1;
+  }
+  .logo span { color: var(--blue-bright); text-shadow: 0 0 20px rgba(91,163,255,0.5); }
+  .tagline {
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: rgba(45,127,255,0.05);
+  }
+  .input-section { margin-bottom: 28px; }
+  .label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .label-row label {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  #charCount { font-size: 0.7rem; color: var(--muted); }
+  textarea {
+    width: 100%;
+    min-height: 240px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    color: var(--text);
+    font-family: 'Instrument Serif', serif;
+    font-size: 1rem;
+    line-height: 1.75;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  textarea:focus {
+    border-color: var(--blue-main);
+    box-shadow: 0 0 0 3px rgba(45,127,255,0.12);
+  }
+  textarea::placeholder { color: #0f1e3d; font-style: italic; }
+  .actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+  }
+  .btn-analyze {
+    flex: 1;
+    min-width: 180px;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #1a5fd4, #2d7fff);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  }
+  .btn-analyze:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(45,127,255,0.35);
+  }
+  .btn-analyze:active { transform: translateY(0); }
+  .btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-clear {
+    padding: 14px 20px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .btn-clear:hover { color: var(--text); border-color: var(--blue-main); }
+  .loading {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+  }
+  .loading.active { display: flex; }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue-bright);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .result-card {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    animation: fadeUp 0.4s ease;
+  }
+  .result-card.active { display: block; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .result-header {
+    padding: 28px 28px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .verdict { display: flex; align-items: center; gap: 14px; }
+  .verdict-badge {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+  .verdict-badge.ai { background: var(--glow-ai); border: 1.5px solid var(--accent-ai); }
+  .verdict-badge.human { background: var(--glow-human); border: 1.5px solid var(--accent-human); }
+  .verdict-badge.mixed { background: rgba(255,209,102,0.1); border: 1.5px solid var(--accent-yellow); }
+  .verdict-label {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+  .verdict-label.ai { color: var(--accent-ai); }
+  .verdict-label.human { color: var(--accent-human); }
+  .verdict-label.mixed { color: var(--accent-yellow); }
+  .verdict-sub { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+  .score-box { text-align: right; }
+  .score-num {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 2.4rem;
+    line-height: 1;
+  }
+  .score-num.ai { color: var(--accent-ai); }
+  .score-num.human { color: var(--accent-human); }
+  .score-num.mixed { color: var(--accent-yellow); }
+  .score-label { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .bar-section { padding: 20px 28px; border-bottom: 1px solid var(--border); }
+  .bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .bar-track { height: 8px; background: #060f24; border-radius: 99px; overflow: hidden; }
+  .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 0%;
+  }
+  .bar-fill.ai { background: linear-gradient(90deg, #c9213e, #ff4d6d); }
+  .bar-fill.human { background: linear-gradient(90deg, #0099cc, #00cfff); }
+  .bar-fill.mixed { background: linear-gradient(90deg, #d4a01a, #ffd166); }
+  .signals-section { padding: 24px 28px; border-bottom: 1px solid var(--border); }
+  .section-title {
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .signals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .signal-chip {
+    padding: 10px 14px;
+    background: #060d1e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.3;
+  }
+  .signal-chip .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .signal-chip.negative .dot { background: var(--accent-ai); }
+  .signal-chip.positive .dot { background: var(--accent-human); }
+  .signal-chip.neutral .dot { background: var(--accent-yellow); }
+  .analysis-section { padding: 24px 28px; }
+  #analysisText {
+    font-family: 'Instrument Serif', serif;
+    font-size: 0.97rem;
+    line-height: 1.8;
+    color: #7a9cc8;
+  }
+  .error-box {
+    display: none;
+    padding: 16px 20px;
+    background: rgba(240,58,95,0.08);
+    border: 1px solid rgba(240,58,95,0.25);
+    border-radius: 10px;
+    color: var(--accent-ai);
+    font-size: 0.8rem;
+    margin-bottom: 24px;
+  }
+  .error-box.active { display: block; }
+  footer {
+    margin-top: 60px;
+    text-align: center;
+    font-size: 0.68rem;
+    color: #0f1e3d;
+    letter-spacing: 0.08em;
+  }
+  @media (max-width: 520px) {
+    .result-header { flex-direction: column; }
+    .score-box { text-align: left; }
+    .logo { font-size: 2rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <header>
+    <div class="logo-block">
+      <div class="logo-kir">KIR</div>
+      <div class="logo">CHEX<span>O</span></div>
+    </div>
+    <div class="tagline">AI Text Detector</div>
+  </header>
 
+  <div class="input-section">
+    <div class="label-row">
+      <label for="inputText">Teks yang ingin dianalisis</label>
+      <span id="charCount">0 karakter</span>
+    </div>
+    <textarea id="inputText" placeholder="Tempel atau ketik teks di sini... Minimal 50 karakter untuk hasil yang akurat." maxlength="6000"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn-analyze" id="analyzeBtn" onclick="analyzeText()">Analisis Sekarang →</button>
+    <button class="btn-clear" onclick="clearAll()">Hapus</button>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+  <div class="loading" id="loading">
     <div class="spinner"></div>
     <span>MENGANALISIS POLA TEKS...</span>
   </div>
